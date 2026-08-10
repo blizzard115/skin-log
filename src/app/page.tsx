@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const skinItems = ["赤み", "乾燥", "ニキビ", "皮脂"];
 
 const flowSteps = [
@@ -46,12 +48,12 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col gap-5">
-              <button
-                type="button"
+              <Link
+                href="/records/new"
                 className="flex h-12 w-full items-center justify-center rounded-lg bg-sky-600 px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 sm:w-fit"
               >
                 今日の肌を記録する
-              </button>
+              </Link>
 
               <ul className="flex flex-wrap gap-2" aria-label="記録項目の例">
                 {skinItems.map((item) => (
