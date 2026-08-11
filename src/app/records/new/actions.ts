@@ -91,7 +91,7 @@ export async function saveSkinRecord(
   }
 
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from("skin_records").insert({
       record_date: input.recordDate,
       overall_condition: Number(input.overallCondition),
