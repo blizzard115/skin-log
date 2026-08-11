@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { saveSkinRecord } from "./actions";
 
 type OverallCondition = "" | "1" | "2" | "3" | "4" | "5";
 type SelectedOverallCondition = Exclude<OverallCondition, "">;
@@ -73,6 +74,8 @@ export function SkinRecordForm() {
     useState<SkinRecordFormValues>(initialFormValues);
   const [errors, setErrors] = useState<SkinRecordFormErrors>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const updateField = <FieldName extends keyof SkinRecordFormValues>(
     fieldName: FieldName,
@@ -83,6 +86,7 @@ export function SkinRecordForm() {
       [fieldName]: value,
     }));
     setSuccessMessage("");
+    setSubmitErrorMessage("");
 
     if (fieldName === "recordDate" && value !== "") {
       setErrors((currentErrors) => {
@@ -122,8 +126,12 @@ export function SkinRecordForm() {
       updateField(fieldName, event.target.value);
     };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (isSaving) {
+      return;
+    }
 
     const nextErrors: SkinRecordFormErrors = {};
 
@@ -136,13 +144,34 @@ export function SkinRecordForm() {
     }
 
     setErrors(nextErrors);
+    setSuccessMessage("");
+    setSubmitErrorMessage("");
 
     if (nextErrors.recordDate || nextErrors.overallCondition) {
-      setSuccessMessage("");
       return;
     }
 
-    setSuccessMessage("入力内容を確認できました");
+    setIsSaving(true);
+
+    try {
+      const result = await saveSkinRecord(formValues);
+
+      if (result.success) {
+        setFormValues(initialFormValues);
+        setErrors({});
+        setSuccessMessage(result.message);
+        return;
+      }
+
+      setErrors(result.fieldErrors ?? {});
+      setSubmitErrorMessage(result.message);
+    } catch {
+      setSubmitErrorMessage(
+        "肌記録を保存できませんでした。時間をおいてもう一度お試しください。",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -290,13 +319,20 @@ export function SkinRecordForm() {
       <div className="mt-8 border-t border-slate-100 pt-6">
         <button
           type="submit"
-          className="flex h-12 w-full items-center justify-center rounded-lg bg-sky-600 px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 sm:w-fit"
+          disabled={isSaving}
+          className="flex h-12 w-full items-center justify-center rounded-lg bg-sky-600 px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-fit"
         >
-          記録を保存する
+          {isSaving ? "保存中..." : "記録を保存する"}
         </button>
         <p className="mt-3 text-sm leading-6 text-slate-500">
-          保存機能はまだ未実装です。今は画面の見た目と入力項目だけを確認できます。
+          送信するとSupabaseへ1件保存します。認証機能はまだ未実装です。
         </p>
+
+        {submitErrorMessage ? (
+          <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {submitErrorMessage}
+          </p>
+        ) : null}
 
         {successMessage ? (
           <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
