@@ -325,7 +325,7 @@ export function SkinRecordForm() {
           {isSaving ? "保存中..." : "記録を保存する"}
         </button>
         <p className="mt-3 text-sm leading-6 text-slate-500">
-          送信するとSupabaseへ1件保存します。認証機能はまだ未実装です。
+          送信するとログイン中のアカウントの肌記録としてSupabaseへ1件保存します。
         </p>
 
         {submitErrorMessage ? (

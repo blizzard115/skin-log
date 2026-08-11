@@ -90,9 +90,29 @@ export async function saveSkinRecord(
     };
   }
 
+  const supabase = await createSupabaseServerClient();
+  let userId: string | undefined;
+
   try {
-    const supabase = createSupabaseServerClient();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    userId = claimsData?.claims.sub;
+  } catch {
+    return {
+      success: false,
+      message: "ログインが必要です。ログインし直してから保存してください。",
+    };
+  }
+
+  if (!userId) {
+    return {
+      success: false,
+      message: "ログインが必要です。ログインし直してから保存してください。",
+    };
+  }
+
+  try {
     const { error } = await supabase.from("skin_records").insert({
+      user_id: userId,
       record_date: input.recordDate,
       overall_condition: Number(input.overallCondition),
       redness: toNullableConcernLevel(input.redness),
