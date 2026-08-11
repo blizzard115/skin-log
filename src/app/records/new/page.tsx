@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { signOutAction } from "@/app/auth/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SkinRecordForm } from "./skin-record-form";
@@ -36,8 +37,19 @@ export default async function NewRecordPage({
 }: NewRecordPageProps) {
   const { auth } = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getClaims();
-  const isLoggedIn = Boolean(data?.claims);
+  let isLoggedIn = false;
+
+  try {
+    const { data } = await supabase.auth.getClaims();
+    isLoggedIn = Boolean(data?.claims);
+  } catch {
+    isLoggedIn = false;
+  }
+
+  if (!isLoggedIn) {
+    redirect("/auth/login");
+  }
+
   const authNoticeMessage = getAuthNoticeMessage(getFirstSearchParam(auth));
 
   return (
@@ -52,23 +64,14 @@ export default async function NewRecordPage({
               ← トップページへ戻る
             </Link>
 
-            {isLoggedIn ? (
-              <form action={signOutAction}>
-                <button
-                  type="submit"
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-sky-200 hover:text-sky-700"
-                >
-                  ログアウト
-                </button>
-              </form>
-            ) : (
-              <Link
-                href="/auth/login"
-                className="h-10 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-sky-200 hover:text-sky-700"
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-sky-200 hover:text-sky-700"
               >
-                ログイン
-              </Link>
-            )}
+                ログアウト
+              </button>
+            </form>
           </div>
 
           <div className="space-y-3">
