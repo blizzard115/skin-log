@@ -165,9 +165,10 @@ export default async function RecordsPage() {
         {!error && records.length > 0 ? (
           <section className="grid gap-4" aria-label="肌記録一覧">
             {records.map((record) => (
-              <article
+              <Link
                 key={record.id}
-                className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                href={`/records/${record.id}`}
+                className="block rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-sky-200 hover:bg-sky-50 sm:p-6"
               >
                 <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -231,7 +232,11 @@ export default async function RecordsPage() {
                 <p className="mt-5 border-t border-slate-100 pt-4 text-xs font-medium text-slate-400">
                   保存日時: {formatCreatedAt(record.created_at)}
                 </p>
-              </article>
+
+                <p className="mt-4 text-sm font-semibold text-sky-700">
+                  詳細を見る →
+                </p>
+              </Link>
             ))}
           </section>
         ) : null}
