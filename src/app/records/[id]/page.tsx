@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { signOutAction } from "@/app/auth/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { DeleteRecordButton } from "./delete/delete-record-button";
 
 type ConcernLevel = "なし" | "少し" | "気になる" | "強い" | null;
 
@@ -237,6 +238,10 @@ export default async function RecordDetailPage({
               >
                 編集する
               </Link>
+            </div>
+
+            <div className="mt-6">
+              <DeleteRecordButton recordId={record.id} />
             </div>
           </article>
         ) : null}
