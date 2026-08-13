@@ -229,6 +229,15 @@ export default async function RecordDetailPage({
                 </p>
               </div>
             </section>
+
+            <div className="mt-8 border-t border-slate-100 pt-6">
+              <Link
+                href={`/records/${record.id}/edit`}
+                className="flex h-12 w-full items-center justify-center rounded-lg bg-sky-600 px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 sm:w-fit"
+              >
+                編集する
+              </Link>
+            </div>
           </article>
         ) : null}
       </div>
