@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getRecordDateValidationError } from "@/lib/record-date";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type OverallCondition = "" | "1" | "2" | "3" | "4" | "5";
@@ -37,10 +38,6 @@ type UpdateSkinRecordResult =
 const validOverallConditions = ["1", "2", "3", "4", "5"];
 const validConcernLevels = ["", "なし", "少し", "気になる", "強い"];
 
-function isValidRecordDate(recordDate: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(recordDate);
-}
-
 function isValidOverallCondition(value: string): value is OverallCondition {
   return validOverallConditions.includes(value);
 }
@@ -69,10 +66,10 @@ export async function updateSkinRecord(
     };
   }
 
-  if (input.recordDate === "") {
-    fieldErrors.recordDate = "記録日を入力してください";
-  } else if (!isValidRecordDate(input.recordDate)) {
-    fieldErrors.recordDate = "記録日を正しい形式で入力してください";
+  const recordDateError = getRecordDateValidationError(input.recordDate);
+
+  if (recordDateError) {
+    fieldErrors.recordDate = recordDateError;
   }
 
   if (input.overallCondition === "") {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { getRecordDateValidationError } from "@/lib/record-date";
 import { saveSkinRecord } from "./actions";
 
 type OverallCondition = "" | "1" | "2" | "3" | "4" | "5";
@@ -24,6 +25,10 @@ type SkinRecordFormValues = {
 type SkinRecordFormErrors = {
   recordDate?: string;
   overallCondition?: string;
+};
+
+type SkinRecordFormProps = {
+  maxRecordDate: string;
 };
 
 const conditionOptions: {
@@ -69,7 +74,7 @@ const inputClassName =
 const textareaClassName =
   "mt-2 min-h-28 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base leading-7 text-slate-950 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100";
 
-export function SkinRecordForm() {
+export function SkinRecordForm({ maxRecordDate }: SkinRecordFormProps) {
   const [formValues, setFormValues] =
     useState<SkinRecordFormValues>(initialFormValues);
   const [errors, setErrors] = useState<SkinRecordFormErrors>({});
@@ -134,9 +139,13 @@ export function SkinRecordForm() {
     }
 
     const nextErrors: SkinRecordFormErrors = {};
+    const recordDateError = getRecordDateValidationError(
+      formValues.recordDate,
+      maxRecordDate,
+    );
 
-    if (formValues.recordDate === "") {
-      nextErrors.recordDate = "記録日を入力してください";
+    if (recordDateError) {
+      nextErrors.recordDate = recordDateError;
     }
 
     if (formValues.overallCondition === "") {
@@ -177,6 +186,7 @@ export function SkinRecordForm() {
   return (
     <form
       onSubmit={handleSubmit}
+      noValidate
       className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
     >
       <div className="space-y-8">
@@ -191,6 +201,7 @@ export function SkinRecordForm() {
             id="record-date"
             name="recordDate"
             type="date"
+            max={maxRecordDate}
             value={formValues.recordDate}
             onChange={handleRecordDateChange}
             aria-invalid={Boolean(errors.recordDate)}
