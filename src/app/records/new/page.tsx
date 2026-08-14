@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOutAction } from "@/app/auth/actions";
+import { getTodayInJapan } from "@/lib/record-date";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SkinRecordForm } from "./skin-record-form";
 
@@ -51,6 +52,7 @@ export default async function NewRecordPage({
   }
 
   const authNoticeMessage = getAuthNoticeMessage(getFirstSearchParam(auth));
+  const maxRecordDate = getTodayInJapan();
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -95,7 +97,7 @@ export default async function NewRecordPage({
           </p>
         ) : null}
 
-        <SkinRecordForm />
+        <SkinRecordForm maxRecordDate={maxRecordDate} />
       </div>
     </main>
   );

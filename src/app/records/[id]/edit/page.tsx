@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { signOutAction } from "@/app/auth/actions";
+import { getTodayInJapan } from "@/lib/record-date";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SkinRecordEditForm } from "./skin-record-edit-form";
 
@@ -106,6 +107,7 @@ export default async function RecordEditPage({
   const overallCondition = record
     ? toEditOverallCondition(record.overall_condition)
     : undefined;
+  const maxRecordDate = getTodayInJapan();
 
   if (record && !overallCondition) {
     notFound();
@@ -162,6 +164,7 @@ export default async function RecordEditPage({
         {!error && record && overallCondition ? (
           <SkinRecordEditForm
             recordId={record.id}
+            maxRecordDate={maxRecordDate}
             initialValues={{
               recordDate: record.record_date,
               overallCondition,

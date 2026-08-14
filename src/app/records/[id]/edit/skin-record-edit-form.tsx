@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { getRecordDateValidationError } from "@/lib/record-date";
 import { updateSkinRecord, type SkinRecordEditInput } from "./actions";
 
 type OverallCondition = SkinRecordEditInput["overallCondition"];
@@ -21,6 +22,7 @@ type SkinRecordEditFormErrors = {
 
 type SkinRecordEditFormProps = {
   recordId: number;
+  maxRecordDate: string;
   initialValues: SkinRecordEditFormValues;
 };
 
@@ -58,6 +60,7 @@ const textareaClassName =
 
 export function SkinRecordEditForm({
   recordId,
+  maxRecordDate,
   initialValues,
 }: SkinRecordEditFormProps) {
   const router = useRouter();
@@ -123,9 +126,13 @@ export function SkinRecordEditForm({
     }
 
     const nextErrors: SkinRecordEditFormErrors = {};
+    const recordDateError = getRecordDateValidationError(
+      formValues.recordDate,
+      maxRecordDate,
+    );
 
-    if (formValues.recordDate === "") {
-      nextErrors.recordDate = "記録日を入力してください";
+    if (recordDateError) {
+      nextErrors.recordDate = recordDateError;
     }
 
     if (formValues.overallCondition === "") {
@@ -167,6 +174,7 @@ export function SkinRecordEditForm({
   return (
     <form
       onSubmit={handleSubmit}
+      noValidate
       className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
     >
       <div className="space-y-8">
@@ -181,6 +189,7 @@ export function SkinRecordEditForm({
             id="record-date"
             name="recordDate"
             type="date"
+            max={maxRecordDate}
             value={formValues.recordDate}
             onChange={handleRecordDateChange}
             aria-invalid={Boolean(errors.recordDate)}
