@@ -41,5 +41,8 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Generate Next.js types
+        run: npx next typegen
+
       - name: Run type check
         run: npx tsc --noEmit
