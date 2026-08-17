@@ -122,12 +122,20 @@ export default async function RecordsPage() {
               </div>
             </div>
 
-            <Link
-              href="/records/new"
-              className="flex h-12 w-full items-center justify-center rounded-lg bg-sky-600 px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 sm:w-fit"
-            >
-              今日の肌を記録する
-            </Link>
+            <div className="flex w-full flex-col gap-3 sm:w-fit sm:flex-row">
+              <Link
+                href="/records/trends"
+                className="flex h-12 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-6 text-base font-semibold text-slate-700 shadow-sm transition-colors hover:border-sky-200 hover:text-sky-700 sm:w-fit"
+              >
+                肌状態の推移を見る
+              </Link>
+              <Link
+                href="/records/new"
+                className="flex h-12 w-full items-center justify-center rounded-lg bg-sky-600 px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 sm:w-fit"
+              >
+                今日の肌を記録する
+              </Link>
+            </div>
           </div>
         </header>
 
