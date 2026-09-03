@@ -1,7 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getRecordDateValidationError } from "@/lib/record-date";
+import { validateOptionalSkinRecordPhotoFile } from "@/lib/skin-record-photo";
+import {
+  getOptionalSkinRecordPhotoFile,
+  removeSkinRecordPhoto,
+  uploadSkinRecordPhoto,
+} from "@/lib/supabase/skin-record-photos";
 
 type OverallCondition = "" | "1" | "2" | "3" | "4" | "5";
 type ConcernLevel = "" | "なし" | "少し" | "気になる" | "強い";
@@ -20,6 +27,7 @@ type SkinRecordInput = {
 type SkinRecordFieldErrors = {
   recordDate?: string;
   overallCondition?: string;
+  photo?: string;
 };
 
 type SaveSkinRecordResult =
@@ -48,9 +56,32 @@ function toNullableConcernLevel(value: ConcernLevel) {
   return value === "" ? null : value;
 }
 
+function getStringFormValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
+function getSkinRecordInput(formData: FormData): SkinRecordInput {
+  return {
+    recordDate: getStringFormValue(formData, "recordDate"),
+    overallCondition: getStringFormValue(
+      formData,
+      "overallCondition",
+    ) as OverallCondition,
+    redness: getStringFormValue(formData, "redness") as ConcernLevel,
+    dryness: getStringFormValue(formData, "dryness") as ConcernLevel,
+    acne: getStringFormValue(formData, "acne") as ConcernLevel,
+    oiliness: getStringFormValue(formData, "oiliness") as ConcernLevel,
+    skincareUsed: getStringFormValue(formData, "skincareUsed"),
+    memo: getStringFormValue(formData, "memo"),
+  };
+}
+
 export async function saveSkinRecord(
-  input: SkinRecordInput,
+  formData: FormData,
 ): Promise<SaveSkinRecordResult> {
+  const input = getSkinRecordInput(formData);
+  const photoFile = getOptionalSkinRecordPhotoFile(formData.get("photo"));
   const fieldErrors: SkinRecordFieldErrors = {};
   const recordDateError = getRecordDateValidationError(input.recordDate);
 
@@ -78,7 +109,17 @@ export async function saveSkinRecord(
     };
   }
 
-  if (fieldErrors.recordDate || fieldErrors.overallCondition) {
+  const photoValidationResult = validateOptionalSkinRecordPhotoFile(photoFile);
+
+  if (!photoValidationResult.ok) {
+    fieldErrors.photo = photoValidationResult.message;
+  }
+
+  if (
+    fieldErrors.recordDate ||
+    fieldErrors.overallCondition ||
+    fieldErrors.photo
+  ) {
     return {
       success: false,
       message: "入力内容を確認してください。",
@@ -106,7 +147,29 @@ export async function saveSkinRecord(
     };
   }
 
+  let uploadedPhotoPath: string | null = null;
+
   try {
+    if (photoFile) {
+      const uploadResult = await uploadSkinRecordPhoto({
+        supabase,
+        userId,
+        photoFile,
+      });
+
+      if (!uploadResult.success) {
+        return {
+          success: false,
+          message: uploadResult.message,
+          fieldErrors: {
+            photo: uploadResult.message,
+          },
+        };
+      }
+
+      uploadedPhotoPath = uploadResult.photoPath;
+    }
+
     const { error } = await supabase.from("skin_records").insert({
       user_id: userId,
       record_date: input.recordDate,
@@ -117,23 +180,62 @@ export async function saveSkinRecord(
       oiliness: toNullableConcernLevel(input.oiliness),
       skincare_used: input.skincareUsed,
       memo: input.memo,
+      photo_path: uploadedPhotoPath,
     });
 
     if (error) {
+      if (uploadedPhotoPath) {
+        const removeResult = await removeSkinRecordPhoto({
+          supabase,
+          userId,
+          photoPath: uploadedPhotoPath,
+        });
+
+        if (!removeResult.success) {
+          console.error("Failed to remove uploaded skin record photo.", {
+            errorName: removeResult.errorName,
+          });
+        }
+      }
+
       return {
         success: false,
         message: "肌記録を保存できませんでした。時間をおいてもう一度お試しください。",
       };
     }
 
-    return {
-      success: true,
-      message: "肌記録を保存しました",
-    };
   } catch {
+    if (uploadedPhotoPath) {
+      const removeResult = await removeSkinRecordPhoto({
+        supabase,
+        userId,
+        photoPath: uploadedPhotoPath,
+      });
+
+      if (!removeResult.success) {
+        console.error("Failed to remove uploaded skin record photo.", {
+          errorName: removeResult.errorName,
+        });
+      }
+    }
+
     return {
       success: false,
       message: "肌記録を保存できませんでした。時間をおいてもう一度お試しください。",
     };
   }
+
+  try {
+    revalidatePath("/records");
+    revalidatePath("/records/trends");
+  } catch (error) {
+    console.error("Failed to revalidate skin record paths after save.", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
+
+  return {
+    success: true,
+    message: "肌記録を保存しました",
+  };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { removeSkinRecordPhoto } from "@/lib/supabase/skin-record-photos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type DeleteSkinRecordResult =
@@ -47,15 +48,17 @@ export async function deleteSkinRecord(
     };
   }
 
+  let deletedPhotoPath: string | null = null;
+
   try {
     const { data: deletedRecord, error } = await supabase
       .from("skin_records")
       .delete()
       .eq("id", recordId)
       .eq("user_id", userId)
-      .select("id")
+      .select("id, photo_path")
       .maybeSingle()
-      .returns<{ id: number } | null>();
+      .returns<{ id: number; photo_path: string | null } | null>();
 
     if (error) {
       console.error("Failed to delete skin record.", { code: error.code });
@@ -72,6 +75,8 @@ export async function deleteSkinRecord(
         message: "肌記録を削除できませんでした。画面を更新してもう一度お試しください。",
       };
     }
+
+    deletedPhotoPath = deletedRecord.photo_path;
   } catch (error) {
     console.error("Unexpected error while deleting skin record.", {
       errorName: error instanceof Error ? error.name : "UnknownError",
@@ -83,8 +88,35 @@ export async function deleteSkinRecord(
     };
   }
 
-  revalidatePath("/records");
-  revalidatePath(`/records/${recordId}`);
+  if (deletedPhotoPath) {
+    try {
+      const removeResult = await removeSkinRecordPhoto({
+        supabase,
+        userId,
+        photoPath: deletedPhotoPath,
+      });
+
+      if (!removeResult.success) {
+        console.error("Failed to remove skin record photo after deletion.", {
+          errorName: removeResult.errorName,
+        });
+      }
+    } catch (error) {
+      console.error("Unexpected error while removing skin record photo.", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
+  }
+
+  try {
+    revalidatePath("/records");
+    revalidatePath(`/records/${recordId}`);
+    revalidatePath("/records/trends");
+  } catch (error) {
+    console.error("Failed to revalidate skin record paths after deletion.", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
 
   return {
     success: true,

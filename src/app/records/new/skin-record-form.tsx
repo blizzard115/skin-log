@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { getRecordDateValidationError } from "@/lib/record-date";
+import {
+  skinRecordPhotoInputAccept,
+  validateOptionalSkinRecordPhotoFile,
+} from "@/lib/skin-record-photo";
 import { saveSkinRecord } from "./actions";
 
 type OverallCondition = "" | "1" | "2" | "3" | "4" | "5";
@@ -25,6 +29,7 @@ type SkinRecordFormValues = {
 type SkinRecordFormErrors = {
   recordDate?: string;
   overallCondition?: string;
+  photo?: string;
 };
 
 type SkinRecordFormProps = {
@@ -74,6 +79,9 @@ const inputClassName =
 const textareaClassName =
   "mt-2 min-h-28 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base leading-7 text-slate-950 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100";
 
+const fileInputClassName =
+  "mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 shadow-sm file:mr-4 file:rounded-md file:border-0 file:bg-sky-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-sky-700 hover:file:bg-sky-100 focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-100";
+
 export function SkinRecordForm({ maxRecordDate }: SkinRecordFormProps) {
   const [formValues, setFormValues] =
     useState<SkinRecordFormValues>(initialFormValues);
@@ -81,6 +89,8 @@ export function SkinRecordForm({ maxRecordDate }: SkinRecordFormProps) {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedPhotoName, setSelectedPhotoName] = useState("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const updateField = <FieldName extends keyof SkinRecordFormValues>(
     fieldName: FieldName,
@@ -131,6 +141,46 @@ export function SkinRecordForm({ maxRecordDate }: SkinRecordFormProps) {
       updateField(fieldName, event.target.value);
     };
 
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const photoFile = event.target.files?.[0];
+    const validationResult = validateOptionalSkinRecordPhotoFile(photoFile);
+
+    setSelectedPhotoName(photoFile?.name ?? "");
+    setSuccessMessage("");
+    setSubmitErrorMessage("");
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+
+      if (validationResult.ok) {
+        delete nextErrors.photo;
+      } else {
+        nextErrors.photo = validationResult.message;
+      }
+
+      return nextErrors;
+    });
+  };
+
+  const createFormData = () => {
+    const formData = new FormData();
+    formData.set("recordDate", formValues.recordDate);
+    formData.set("overallCondition", formValues.overallCondition);
+    formData.set("redness", formValues.redness);
+    formData.set("dryness", formValues.dryness);
+    formData.set("acne", formValues.acne);
+    formData.set("oiliness", formValues.oiliness);
+    formData.set("skincareUsed", formValues.skincareUsed);
+    formData.set("memo", formValues.memo);
+
+    const photoFile = photoInputRef.current?.files?.[0];
+
+    if (photoFile) {
+      formData.set("photo", photoFile);
+    }
+
+    return formData;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -152,22 +202,38 @@ export function SkinRecordForm({ maxRecordDate }: SkinRecordFormProps) {
       nextErrors.overallCondition = "肌の総合状態を選択してください";
     }
 
+    const photoFile = photoInputRef.current?.files?.[0];
+    const photoValidationResult =
+      validateOptionalSkinRecordPhotoFile(photoFile);
+
+    if (!photoValidationResult.ok) {
+      nextErrors.photo = photoValidationResult.message;
+    }
+
     setErrors(nextErrors);
     setSuccessMessage("");
     setSubmitErrorMessage("");
 
-    if (nextErrors.recordDate || nextErrors.overallCondition) {
+    if (
+      nextErrors.recordDate ||
+      nextErrors.overallCondition ||
+      nextErrors.photo
+    ) {
       return;
     }
 
     setIsSaving(true);
 
     try {
-      const result = await saveSkinRecord(formValues);
+      const result = await saveSkinRecord(createFormData());
 
       if (result.success) {
         setFormValues(initialFormValues);
         setErrors({});
+        setSelectedPhotoName("");
+        if (photoInputRef.current) {
+          photoInputRef.current.value = "";
+        }
         setSuccessMessage(result.message);
         return;
       }
@@ -324,6 +390,44 @@ export function SkinRecordForm({ maxRecordDate }: SkinRecordFormProps) {
             className={textareaClassName}
             placeholder="例：寝不足、ひげ剃り後に赤みが出た、外出時間が長かった"
           />
+        </div>
+
+        <div>
+          <label
+            htmlFor="skin-record-photo"
+            className="text-sm font-semibold text-slate-900"
+          >
+            肌写真（任意）
+          </label>
+          <input
+            ref={photoInputRef}
+            id="skin-record-photo"
+            name="photo"
+            type="file"
+            accept={skinRecordPhotoInputAccept}
+            onChange={handlePhotoChange}
+            aria-invalid={Boolean(errors.photo)}
+            aria-describedby={
+              errors.photo ? "skin-record-photo-error" : "skin-record-photo-help"
+            }
+            className={fileInputClassName}
+          />
+          <p id="skin-record-photo-help" className="mt-2 text-sm text-slate-500">
+            JPEG・PNG・WebP形式、3MB以内の写真を1枚だけ添付できます。
+          </p>
+          {selectedPhotoName ? (
+            <p className="mt-2 text-sm font-medium text-slate-700">
+              選択中: {selectedPhotoName}
+            </p>
+          ) : null}
+          {errors.photo ? (
+            <p
+              id="skin-record-photo-error"
+              className="mt-2 text-sm font-medium text-red-600"
+            >
+              {errors.photo}
+            </p>
+          ) : null}
         </div>
       </div>
 

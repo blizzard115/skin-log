@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { signOutAction } from "@/app/auth/actions";
+import { createSkinRecordPhotoSignedUrl } from "@/lib/supabase/skin-record-photos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DeleteRecordButton } from "./delete/delete-record-button";
 
@@ -18,6 +19,7 @@ type SkinRecord = {
   skincare_used: string | null;
   memo: string | null;
   created_at: string;
+  photo_path: string | null;
 };
 
 type RecordDetailPageProps = {
@@ -103,7 +105,7 @@ export default async function RecordDetailPage({
   const { data: record, error } = await supabase
     .from("skin_records")
     .select(
-      "id, record_date, overall_condition, redness, dryness, acne, oiliness, skincare_used, memo, created_at",
+      "id, record_date, overall_condition, redness, dryness, acne, oiliness, skincare_used, memo, created_at, photo_path",
     )
     .eq("id", recordId)
     .eq("user_id", userId)
@@ -113,6 +115,14 @@ export default async function RecordDetailPage({
   if (!record && !error) {
     notFound();
   }
+
+  const photoUrl = record?.photo_path
+    ? await createSkinRecordPhotoSignedUrl({
+        supabase,
+        userId,
+        photoPath: record.photo_path,
+      })
+    : undefined;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -214,6 +224,32 @@ export default async function RecordDetailPage({
             </dl>
 
             <section className="mt-6 space-y-5">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  肌写真
+                </h3>
+                {photoUrl ? (
+                  <div className="mt-2 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photoUrl}
+                      alt={`${formatRecordDate(record.record_date)}の肌写真`}
+                      width={800}
+                      height={600}
+                      className="aspect-[4/3] w-full object-cover"
+                    />
+                  </div>
+                ) : record.photo_path ? (
+                  <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+                    写真を読み込めませんでした。時間をおいてもう一度お試しください。
+                  </p>
+                ) : (
+                  <p className="mt-2 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-500">
+                    未登録
+                  </p>
+                )}
+              </div>
+
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">
                   使用したスキンケア

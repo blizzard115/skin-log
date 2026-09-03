@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { getRecordDateValidationError } from "@/lib/record-date";
+import {
+  skinRecordPhotoInputAccept,
+  validateOptionalSkinRecordPhotoFile,
+} from "@/lib/skin-record-photo";
 import { updateSkinRecord, type SkinRecordEditInput } from "./actions";
 
 type OverallCondition = SkinRecordEditInput["overallCondition"];
@@ -18,12 +22,15 @@ type SkinRecordEditFormValues = Omit<SkinRecordEditInput, "recordId">;
 type SkinRecordEditFormErrors = {
   recordDate?: string;
   overallCondition?: string;
+  photo?: string;
 };
 
 type SkinRecordEditFormProps = {
   recordId: number;
   maxRecordDate: string;
   initialValues: SkinRecordEditFormValues;
+  currentPhotoUrl?: string;
+  hasCurrentPhoto: boolean;
 };
 
 const conditionOptions: {
@@ -58,10 +65,15 @@ const inputClassName =
 const textareaClassName =
   "mt-2 min-h-28 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base leading-7 text-slate-950 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100";
 
+const fileInputClassName =
+  "mt-2 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 shadow-sm file:mr-4 file:rounded-md file:border-0 file:bg-sky-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-sky-700 hover:file:bg-sky-100 focus:border-sky-500 focus:outline-none focus:ring-4 focus:ring-sky-100";
+
 export function SkinRecordEditForm({
   recordId,
   maxRecordDate,
   initialValues,
+  currentPhotoUrl,
+  hasCurrentPhoto,
 }: SkinRecordEditFormProps) {
   const router = useRouter();
   const [formValues, setFormValues] =
@@ -69,6 +81,9 @@ export function SkinRecordEditForm({
   const [errors, setErrors] = useState<SkinRecordEditFormErrors>({});
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedPhotoName, setSelectedPhotoName] = useState("");
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const updateField = <FieldName extends keyof SkinRecordEditFormValues>(
     fieldName: FieldName,
@@ -118,6 +133,73 @@ export function SkinRecordEditForm({
       updateField(fieldName, event.target.value);
     };
 
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const photoFile = event.target.files?.[0];
+    const validationResult = validateOptionalSkinRecordPhotoFile(photoFile);
+
+    setSelectedPhotoName(photoFile?.name ?? "");
+    setSubmitErrorMessage("");
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+
+      if (validationResult.ok && !(removePhoto && photoFile)) {
+        delete nextErrors.photo;
+      } else if (removePhoto && photoFile) {
+        nextErrors.photo =
+          "写真を削除する場合は、新しい写真の選択を解除してください。";
+      } else if (!validationResult.ok) {
+        nextErrors.photo = validationResult.message;
+      }
+
+      return nextErrors;
+    });
+  };
+
+  const handleRemovePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+    const photoFile = photoInputRef.current?.files?.[0];
+
+    setRemovePhoto(checked);
+    setSubmitErrorMessage("");
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+
+      if (checked && photoFile) {
+        nextErrors.photo =
+          "写真を削除する場合は、新しい写真の選択を解除してください。";
+      } else {
+        delete nextErrors.photo;
+      }
+
+      return nextErrors;
+    });
+  };
+
+  const createFormData = () => {
+    const formData = new FormData();
+    formData.set("recordId", String(recordId));
+    formData.set("recordDate", formValues.recordDate);
+    formData.set("overallCondition", formValues.overallCondition);
+    formData.set("redness", formValues.redness);
+    formData.set("dryness", formValues.dryness);
+    formData.set("acne", formValues.acne);
+    formData.set("oiliness", formValues.oiliness);
+    formData.set("skincareUsed", formValues.skincareUsed);
+    formData.set("memo", formValues.memo);
+
+    const photoFile = photoInputRef.current?.files?.[0];
+
+    if (photoFile) {
+      formData.set("photo", photoFile);
+    }
+
+    if (removePhoto) {
+      formData.set("removePhoto", "true");
+    }
+
+    return formData;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -139,20 +221,34 @@ export function SkinRecordEditForm({
       nextErrors.overallCondition = "肌の総合状態を選択してください";
     }
 
+    const photoFile = photoInputRef.current?.files?.[0];
+    const photoValidationResult =
+      validateOptionalSkinRecordPhotoFile(photoFile);
+
+    if (!photoValidationResult.ok) {
+      nextErrors.photo = photoValidationResult.message;
+    }
+
+    if (removePhoto && photoFile) {
+      nextErrors.photo =
+        "写真を削除する場合は、新しい写真の選択を解除してください。";
+    }
+
     setErrors(nextErrors);
     setSubmitErrorMessage("");
 
-    if (nextErrors.recordDate || nextErrors.overallCondition) {
+    if (
+      nextErrors.recordDate ||
+      nextErrors.overallCondition ||
+      nextErrors.photo
+    ) {
       return;
     }
 
     setIsSaving(true);
 
     try {
-      const result = await updateSkinRecord({
-        recordId,
-        ...formValues,
-      });
+      const result = await updateSkinRecord(createFormData());
 
       if (result.success) {
         router.push(result.redirectTo);
@@ -313,6 +409,89 @@ export function SkinRecordEditForm({
             placeholder="例：寝不足、ひげ剃り後に赤みが出た、外出時間が長かった"
           />
         </div>
+
+        <section aria-labelledby="skin-record-photo-heading">
+          <h2
+            id="skin-record-photo-heading"
+            className="text-sm font-semibold text-slate-900"
+          >
+            肌写真（任意）
+          </h2>
+
+          {currentPhotoUrl ? (
+            <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={currentPhotoUrl}
+                alt="現在保存されている肌写真"
+                width={800}
+                height={600}
+                className="aspect-[4/3] w-full object-cover"
+              />
+            </div>
+          ) : hasCurrentPhoto ? (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              現在の写真を読み込めませんでした。写真を変更しない限り、保存済みの写真はそのまま残ります。
+            </p>
+          ) : (
+            <p className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              この記録にはまだ写真がありません。
+            </p>
+          )}
+
+          {hasCurrentPhoto ? (
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={removePhoto}
+                onChange={handleRemovePhotoChange}
+                className="mt-0.5 h-5 w-5 rounded border-slate-300 accent-red-600"
+              />
+              <span>
+                写真を削除する
+                <span className="block text-xs leading-5 text-slate-500">
+                  削除して保存すると、この記録から写真が外れます。
+                </span>
+              </span>
+            </label>
+          ) : null}
+
+          <label
+            htmlFor="skin-record-photo"
+            className="mt-5 block text-sm font-semibold text-slate-900"
+          >
+            新しい写真を選択
+          </label>
+          <input
+            ref={photoInputRef}
+            id="skin-record-photo"
+            name="photo"
+            type="file"
+            accept={skinRecordPhotoInputAccept}
+            onChange={handlePhotoChange}
+            aria-invalid={Boolean(errors.photo)}
+            aria-describedby={
+              errors.photo ? "skin-record-photo-error" : "skin-record-photo-help"
+            }
+            className={fileInputClassName}
+          />
+          <p id="skin-record-photo-help" className="mt-2 text-sm text-slate-500">
+            JPEG・PNG・WebP形式、3MB以内の写真を1枚だけ選択できます。新しい写真を選んで保存すると、現在の写真と差し替わります。
+          </p>
+          {selectedPhotoName ? (
+            <p className="mt-2 text-sm font-medium text-slate-700">
+              選択中: {selectedPhotoName}
+            </p>
+          ) : null}
+          {errors.photo ? (
+            <p
+              id="skin-record-photo-error"
+              className="mt-2 text-sm font-medium text-red-600"
+            >
+              {errors.photo}
+            </p>
+          ) : null}
+        </section>
       </div>
 
       <div className="mt-8 border-t border-slate-100 pt-6">
