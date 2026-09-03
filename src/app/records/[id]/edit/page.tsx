@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { signOutAction } from "@/app/auth/actions";
 import { getTodayInJapan } from "@/lib/record-date";
+import { createSkinRecordPhotoSignedUrl } from "@/lib/supabase/skin-record-photos";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SkinRecordEditForm } from "./skin-record-edit-form";
 
@@ -20,6 +21,7 @@ type SkinRecord = {
   oiliness: ConcernLevel;
   skincare_used: string | null;
   memo: string | null;
+  photo_path: string | null;
 };
 
 type RecordEditPageProps = {
@@ -93,7 +95,7 @@ export default async function RecordEditPage({
   const { data: record, error } = await supabase
     .from("skin_records")
     .select(
-      "id, record_date, overall_condition, redness, dryness, acne, oiliness, skincare_used, memo",
+      "id, record_date, overall_condition, redness, dryness, acne, oiliness, skincare_used, memo, photo_path",
     )
     .eq("id", recordId)
     .eq("user_id", userId)
@@ -108,6 +110,13 @@ export default async function RecordEditPage({
     ? toEditOverallCondition(record.overall_condition)
     : undefined;
   const maxRecordDate = getTodayInJapan();
+  const currentPhotoUrl = record?.photo_path
+    ? await createSkinRecordPhotoSignedUrl({
+        supabase,
+        userId,
+        photoPath: record.photo_path,
+      })
+    : undefined;
 
   if (record && !overallCondition) {
     notFound();
@@ -175,6 +184,8 @@ export default async function RecordEditPage({
               skincareUsed: getTextOrEmpty(record.skincare_used),
               memo: getTextOrEmpty(record.memo),
             }}
+            currentPhotoUrl={currentPhotoUrl}
+            hasCurrentPhoto={Boolean(record.photo_path)}
           />
         ) : null}
       </div>
